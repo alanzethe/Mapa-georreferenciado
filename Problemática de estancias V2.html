@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapeo de personas beneficiadas por estancias infantiles</title>
+  
+  <!-- Estilos de Mapbox -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+  
+  <!-- JavaScript de Mapbox -->
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  
+  <!-- Estilo para el mapa, la leyenda y el tooltip -->
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+    /* Estilo para la primera leyenda */
+    #legend {
+      position: absolute;
+      bottom: 15px;
+      left: 5px;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      font-family: Poppins, Poppins;
+      font-size: 12px;
+    }
+
+    #legend h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+
+    #gradient-bar {
+      width: 200px;
+      height: 20px;
+      background: linear-gradient(to right, white, rgb(219, 0, 154));
+      border: 1px solid #000;
+      margin-bottom: 5px;
+    }
+    /* Barra de degradado para la leyenda */
+#circle-gradient-bar {
+  width: 200px;
+  height: 20px;
+  background: linear-gradient(to right, black, rgb(175, 140, 85)); /* De negro a dorado */
+  border: 1px solid #000;
+  margin-bottom: 5px;
+}
+
+#circle-gradient-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+
+    #gradient-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    /* Estilo para el segundo cuadro de leyenda */
+    #circle-legend {
+      position: absolute;
+      bottom: 155px;
+      left: 5px; /* Ajusta para evitar superposición */
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      font-family: Poppins, Poppins;
+      font-size: 12px;
+    }
+
+    #circle-legend h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+
+    .circle-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .circle {
+      border-radius: 50%;
+      background: rgb(175, 140, 85); /* Color del círculo */
+      display: inline-block;
+      margin-right: 10px;
+    }
+
+    .circle.small {
+      width: 10px;
+      height: 10px;
+    }
+
+    .circle.large {
+      width: 30px;
+      height: 30px;
+    }
+
+    #tooltip {
+      position: absolute;
+      background: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+      font-family: Poppins, Poppins;
+      font-size: 12px;
+      pointer-events: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Contenedor del mapa -->
+<div id="map"></div>
+
+<!-- Primera leyenda -->
+<div id="legend">
+  <h3>Población 0 a 5 años en</h3> <h3>pobreza (estimado)</h3>
+  <div id="gradient-bar"></div>
+  <div id="gradient-labels">
+    <span>0</span>
+    <span>69.4</span>
+  </div>
+</div>
+
+<!-- Segunda leyenda -->
+<div id="circle-legend">
+  <h3>Número de Estancias</h3> 
+
+  <!-- Leyenda de círculos -->
+  <div class="circle-container">
+    <div class="circle small"></div>
+    <span>1&nbsp; </span>
+  </div>
+  <div class="circle-container">
+    <div class="circle large"></div>
+    <span>19</span>
+  </div>
+
+  <!-- Nueva barra de degradado -->
+  <h3>Número de beneficiarios</h3>
+  <div id="circle-gradient-bar"></div>
+  <div id="circle-gradient-labels">
+    <span>13</span>
+    <span>628</span>
+  </div>
+</div>
+
+
+<!-- Tooltip -->
+<div id="tooltip"></div>
+
+<script>
+  mapboxgl.accessToken = 'pk.eyJ1IjoiYWxhbmNoYWlyZXMiLCJhIjoiY20zb2oxM2g4MDQ1dzJrb25tdHlkaHllMSJ9.rWCXWa9Jp9UojJL7hI59Fw';
+
+  // Inicializa el mapa
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/alanchaires/cm3q89tp4004h01rw0n7bbclt',
+    center: [-100.44335428716786, 25.720592040452548],
+    zoom: 9
+  });
+
+  // Tooltip
+  const tooltip = document.getElementById('tooltip');
+  
+  // Ajuste de capas y eventos
+  map.on('load', () => {
+    map.setLayerZoomRange('choropleth-labels', 0, 24);
+  });
+
+  map.on('mousemove', 'choropleth-labels', (e) => {
+    if (e.features.length > 0) {
+      const feature = e.features[0];
+      
+      // Formatea los números con comas
+      const coroplethaB = feature.properties.COROPLETA_B ? feature.properties.COROPLETA_B.toLocaleString() : 'Sin datos';
+      const burbuja = feature.properties.BURBUJA ? feature.properties.BURBUJA.toLocaleString() : '0';
+      const estancias = feature.properties.ESTANCIAS ? feature.properties.ESTANCIAS.toLocaleString() : '0';
+      const porcentajeB = feature.properties.PORCENTAJE_B || 'Sin datos';
+      const coropletha = feature.properties.COROPLETA || 'Sin datos';
+
+      tooltip.innerHTML = `
+        <strong>${feature.properties.NOMBRE || 'Desconocido'}</strong><br>
+        Población 0 a 5 años en pobreza: ${coroplethaB}<br>
+        Porcentaje de población 0 a 5 años en pobreza: ${coropletha}<br>
+        Porcentaje de personas beneficiarias respecto a la población de 0 a 5 años en pobreza: ${porcentajeB}<br>
+        Personas beneficiarias por estancias de la SII: ${burbuja}<br>
+        Número de estancias de la SII en el municipio: ${estancias}<br>
+      `;
+      tooltip.style.display = 'block';
+      tooltip.style.left = `${e.point.x + 10}px`;
+      tooltip.style.top = `${e.point.y + 10}px`;
+    }
+  });
+
+  map.on('mouseleave', 'choropleth-labels', () => {
+    tooltip.style.display = 'none';
+  });
+</script>
+
+</body>
+</html>
